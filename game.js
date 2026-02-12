@@ -1,13 +1,13 @@
 // Game Configuration
 const CONFIG = {
     CANVAS_WIDTH: 800,
-    CANVAS_HEIGHT: 600,
-    PLAYER_WIDTH: 40,
-    PLAYER_HEIGHT: 50,
-    FLOOR_HEIGHT: 20,
+    CANVAS_HEIGHT: 800, // Increased height for "zoomed out" feel (more floors visible)
+    PLAYER_WIDTH: 32,   // Smaller player
+    PLAYER_HEIGHT: 40,  // Smaller player
+    FLOOR_HEIGHT: 16,   // Smaller floors
     FLOOR_MIN_WIDTH: 150,
     FLOOR_MAX_WIDTH: 350,
-    FLOOR_VERTICAL_SPACING: 100,
+    FLOOR_VERTICAL_SPACING: 80, // Tighter spacing
     GRAVITY: 0.6,
     JUMP_POWER_BASE: 12,
     JUMP_POWER_MAX: 22,
@@ -24,13 +24,62 @@ const CONFIG = {
     COMBO_MIN_FLOORS: 2,
     COYOTE_TIME: 100, // ms
     SIMULATION_FPS: 120,
-    THEME_INTERVAL: 100
+    THEME_INTERVAL: 100,
+    MOVE_SPEED_MULTIPLIER: 1.0 // Default speed multiplier
 };
+
+const SKINS = [
+    { id: 'default', name: 'Red Box', cost: 0, color: '#FF6347' },
+    { id: 'blue', name: 'Blue Box', cost: 100, color: '#4169E1' },
+    { id: 'green', name: 'Green Box', cost: 100, color: '#32CD32' },
+    { id: 'gold', name: 'Golden Box', cost: 100, color: '#FFD700' },
+    { id: 'ninja', name: 'Ninja', cost: 100, color: '#000000' }
+];
+
+// SHA-256 Hashes of the 10 coupons (1000 coins each)
+const COUPON_HASHES = [
+    '2a4d04dd777ff8035b8605067fb465ca24d3d69a3f18f243bce22cc261088a65',
+    '4ff188ba2f513857d52f68fe980b54e55aa540646bbe00dae628fc9307fa7d16',
+    'ef6301255bb49b6efb2dcadee0885b0e37a5217bed573f01ee6411ec05a7f515',
+    'daa3d077be184b7499397dfefedbcc3c629892caa4ff93c6f9c19678b37253ec',
+    'b6cfb3225752b7d551ab953258bcf92b6631ad9641a386023bf331e66c69f86e',
+    '26fee03c6be15c350bf6ca3199811be0f474770424a1a2a1210b9f72d7e45e31',
+    'cef25f82a630252b50569aa67c51df6614feb273c7f26e9d00ad3d418cb3fa38',
+    '8e000442cc0e5755b8d0be4dc5602f710003237ebd0d1a8fdc10055cce9575a7',
+    '27cef2adb3d1e3fb08abb1f51b62f6d965f8b66b15ee7592382be688b7b7c65f',
+    'c1d2763d88ee1a30651a1b7204bb90685c339e4faad84bff5b9d8cc7c5823672'
+];
+
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 // Game State
 class GameState {
     constructor() {
         this.reset();
+        this.loadUserData();
+    }
+
+    loadUserData() {
+        const data = JSON.parse(localStorage.getItem('brigadiros_user') || '{"coins": 0, "ownedSkins": ["default"], "currentSkin": "default", "redeemedCoupons": []}');
+        this.coins = data.coins;
+        this.ownedSkins = data.ownedSkins;
+        this.currentSkin = data.currentSkin;
+        this.redeemedCoupons = data.redeemedCoupons || [];
+    }
+
+    saveUserData() {
+        const data = {
+            coins: this.coins,
+            ownedSkins: this.ownedSkins,
+            currentSkin: this.currentSkin,
+            redeemedCoupons: this.redeemedCoupons
+        };
+        localStorage.setItem('brigadiros_user', JSON.stringify(data));
     }
 
     reset() {
@@ -142,7 +191,12 @@ class Game {
         document.getElementById('practice-btn').addEventListener('click', () => this.showScreen('practice-screen'));
         document.getElementById('leaderboard-btn').addEventListener('click', () => this.showLeaderboard());
         document.getElementById('settings-btn').addEventListener('click', () => this.showScreen('settings-screen'));
+        document.getElementById('store-btn').addEventListener('click', () => this.showStore());
         
+        // Store buttons
+        document.getElementById('store-back-btn').addEventListener('click', () => this.showScreen('menu-screen'));
+        document.getElementById('redeem-btn').addEventListener('click', () => this.redeemCoupon());
+
         // Pause overlay
         document.getElementById('resume-btn').addEventListener('click', () => this.resumeGame());
         document.getElementById('restart-btn').addEventListener('click', () => this.restartGame());
@@ -158,6 +212,10 @@ class Game {
         
         // Settings
         document.getElementById('settings-back-btn').addEventListener('click', () => this.showScreen('menu-screen'));
+        document.getElementById('game-speed').addEventListener('input', (e) => {
+            CONFIG.MOVE_SPEED_MULTIPLIER = parseFloat(e.target.value);
+            document.getElementById('speed-value').textContent = CONFIG.MOVE_SPEED_MULTIPLIER + 'x';
+        });
         
         // Leaderboard
         document.getElementById('leaderboard-back-btn').addEventListener('click', () => this.showScreen('menu-screen'));
@@ -178,6 +236,85 @@ class Game {
     showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
+    }
+
+    showStore() {
+        this.updateStoreUI();
+        this.showScreen('store-screen');
+    }
+
+    updateStoreUI() {
+        document.getElementById('player-coins').textContent = this.state.coins;
+        const grid = document.getElementById('skins-grid');
+        grid.innerHTML = SKINS.map(skin => {
+            const owned = this.state.ownedSkins.includes(skin.id);
+            const equipped = this.state.currentSkin === skin.id;
+            let btnText = 'Buy';
+            let btnClass = 'buy-btn';
+            
+            if (equipped) {
+                btnText = 'Equipped';
+                btnClass = 'equipped-btn';
+            } else if (owned) {
+                btnText = 'Equip';
+                btnClass = 'equip-btn';
+            } else {
+                btnText = `Buy (${skin.cost})`;
+            }
+
+            return `
+                <div class="skin-card ${owned ? 'owned' : ''} ${equipped ? 'equipped' : ''}" style="border-color: ${skin.color}">
+                    <div class="skin-preview" style="background-color: ${skin.color}"></div>
+                    <div class="skin-name">${skin.name}</div>
+                    <button onclick="window.game.handleSkinAction('${skin.id}')" class="${btnClass}" ${equipped ? 'disabled' : ''}>${btnText}</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    handleSkinAction(skinId) {
+        const skin = SKINS.find(s => s.id === skinId);
+        if (!skin) return;
+
+        if (this.state.ownedSkins.includes(skinId)) {
+            // Equip
+            this.state.currentSkin = skinId;
+            this.state.saveUserData();
+            this.updateStoreUI();
+        } else {
+            // Buy
+            if (this.state.coins >= skin.cost) {
+                this.state.coins -= skin.cost;
+                this.state.ownedSkins.push(skinId);
+                this.state.saveUserData();
+                this.updateStoreUI();
+            } else {
+                alert('Not enough coins!');
+            }
+        }
+    }
+
+    async redeemCoupon() {
+        const input = document.getElementById('coupon-code');
+        const code = input.value.trim();
+        if (!code) return;
+
+        const hash = await sha256(code);
+        
+        if (COUPON_HASHES.includes(hash)) {
+            if (this.state.redeemedCoupons.includes(hash)) {
+                alert('Coupon already redeemed!');
+            } else {
+                this.state.coins += 1000;
+                this.state.redeemedCoupons.push(hash);
+                this.state.saveUserData();
+                this.updateStoreUI();
+                alert('Redeemed 1000 coins!');
+                input.value = '';
+            }
+        } else {
+            alert('Invalid coupon code!');
+        }
     }
 
     startGame() {
@@ -316,20 +453,21 @@ class Game {
 
     updatePlayer(dt) {
         const player = this.state.player;
+        const speedMult = CONFIG.MOVE_SPEED_MULTIPLIER;
         
         // Horizontal movement
         if (this.state.keys['ArrowLeft']) {
             if (player.onGround) {
-                player.vx -= CONFIG.MOVE_ACCELERATION;
+                player.vx -= CONFIG.MOVE_ACCELERATION * speedMult;
             } else {
-                player.vx -= CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL;
+                player.vx -= CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL * speedMult;
             }
         }
         if (this.state.keys['ArrowRight']) {
             if (player.onGround) {
-                player.vx += CONFIG.MOVE_ACCELERATION;
+                player.vx += CONFIG.MOVE_ACCELERATION * speedMult;
             } else {
-                player.vx += CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL;
+                player.vx += CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL * speedMult;
             }
         }
 
@@ -339,13 +477,14 @@ class Game {
         }
 
         // Clamp horizontal speed
-        player.vx = Math.max(-CONFIG.MOVE_MAX_SPEED, Math.min(CONFIG.MOVE_MAX_SPEED, player.vx));
+        const maxSpeed = CONFIG.MOVE_MAX_SPEED * speedMult;
+        player.vx = Math.max(-maxSpeed, Math.min(maxSpeed, player.vx));
 
         // Jump
         const canJump = player.onGround || (Date.now() - player.lastGroundTime < CONFIG.COYOTE_TIME);
         if (this.state.keys[' '] && canJump && player.vy >= 0) {
             const speed = Math.abs(player.vx);
-            const jumpPower = CONFIG.JUMP_POWER_BASE + (speed / CONFIG.MOVE_MAX_SPEED) * (CONFIG.JUMP_POWER_MAX - CONFIG.JUMP_POWER_BASE);
+            const jumpPower = CONFIG.JUMP_POWER_BASE + (speed / maxSpeed) * (CONFIG.JUMP_POWER_MAX - CONFIG.JUMP_POWER_BASE);
             player.vy = -jumpPower;
             player.onGround = false;
             this.state.keys[' '] = false; // Prevent holding
@@ -490,8 +629,7 @@ class Game {
             const remaining = Math.max(0, CONFIG.COMBO_TIMER - elapsed);
             const percentage = (remaining / CONFIG.COMBO_TIMER) * 100;
             document.getElementById('combo-timer-fill').style.width = percentage + '%';
-        } else {
-            comboDisplay.classList.add('combo-hidden');
+        } else {\n            comboDisplay.classList.add('combo-hidden');
         }
     }
 
@@ -548,7 +686,11 @@ class Game {
 
         // Player
         const playerScreenY = this.state.player.y - this.state.camera.y;
-        this.ctx.fillStyle = '#FF6347';
+        
+        // Get current skin color
+        const skin = SKINS.find(s => s.id === this.state.currentSkin) || SKINS[0];
+        this.ctx.fillStyle = skin.color;
+        
         this.ctx.fillRect(
             this.state.player.x,
             playerScreenY,
@@ -556,15 +698,30 @@ class Game {
             CONFIG.PLAYER_HEIGHT
         );
         
-        // Player face
-        this.ctx.fillStyle = '#000';
-        this.ctx.fillRect(this.state.player.x + 10, playerScreenY + 15, 5, 5);
-        this.ctx.fillRect(this.state.player.x + 25, playerScreenY + 15, 5, 5);
-        this.ctx.fillRect(this.state.player.x + 10, playerScreenY + 30, 20, 3);
+        // Player face (adjust based on skin if needed, for now simple)
+        this.ctx.fillStyle = '#000'; // Eyes always black
+        
+        if (skin.id === 'ninja') {
+            // Ninja band
+            this.ctx.fillStyle = '#FF0000';
+            this.ctx.fillRect(this.state.player.x, playerScreenY + 10, CONFIG.PLAYER_WIDTH, 10);
+            this.ctx.fillStyle = '#FFF'; // White eyes
+        }
+        
+        // Eyes
+        this.ctx.fillRect(this.state.player.x + 8, playerScreenY + 15, 5, 5);
+        this.ctx.fillRect(this.state.player.x + 20, playerScreenY + 15, 5, 5);
+        
+        // Mouth
+        if (skin.id !== 'ninja') {
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillRect(this.state.player.x + 8, playerScreenY + 30, 16, 3);
+        }
     }
 }
 
-// Initialize game when page loads
+// Global hook for button clicks
+window.game = null;
 window.addEventListener('load', () => {
-    new Game();
+    window.game = new Game();
 });

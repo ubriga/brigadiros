@@ -13,10 +13,11 @@
             <div class="menu-buttons">
                 <button id="play-btn" class="menu-btn">Play</button>
                 <button id="practice-btn" class="menu-btn">Practice</button>
+                <button id="store-btn" class="menu-btn">Store</button>
                 <button id="leaderboard-btn" class="menu-btn">Leaderboards</button>
                 <button id="settings-btn" class="menu-btn">Settings</button>
             </div>
-            <div class="version">v1.0.0</div>
+            <div class="version">v1.1.0</div>
         </div>
 
         <div id="game-screen" class="screen">
@@ -78,9 +79,36 @@
             </div>
         </div>
 
+        <div id="store-screen" class="screen">
+            <h1>STORE</h1>
+            <div class="store-container">
+                <div class="player-balance">
+                    Coins: <span id="player-coins">0</span> 🪙
+                </div>
+                <div class="coupon-section">
+                    <input type="text" id="coupon-code" placeholder="Enter Coupon Code">
+                    <button id="redeem-btn" class="small-btn">Redeem</button>
+                </div>
+                <div class="skins-grid" id="skins-grid">
+                    <!-- Skins populated by JS -->
+                </div>
+            </div>
+            <button id="store-back-btn" class="menu-btn">Back</button>
+        </div>
+
         <div id="settings-screen" class="screen">
             <h1>SETTINGS</h1>
             <div class="settings-container">
+                <div class="setting-group">
+                    <h3>Gameplay</h3>
+                    <div class="control-item">
+                        <span>Movement Speed:</span>
+                        <div class="slider-container">
+                            <input type="range" id="game-speed" min="0.5" max="1.5" step="0.1" value="1.0">
+                            <span id="speed-value" class="key-display">1.0x</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="setting-group">
                     <h3>Controls</h3>
                     <div class="control-item">
@@ -94,10 +122,6 @@
                     <div class="control-item">
                         <span>Jump:</span>
                         <span class="key-display">Space</span>
-                    </div>
-                    <div class="control-item">
-                        <span>Pause:</span>
-                        <span class="key-display">Esc</span>
                     </div>
                 </div>
                 <div class="setting-group">
