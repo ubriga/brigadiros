@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brigadiros</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="menu-screen" class="screen active">
+            <h1>BRIGADIROS</h1>
+            <div class="menu-buttons">
+                <button id="play-btn" class="menu-btn">Play</button>
+                <button id="practice-btn" class="menu-btn">Practice</button>
+                <button id="leaderboard-btn" class="menu-btn">Leaderboards</button>
+                <button id="settings-btn" class="menu-btn">Settings</button>
+            </div>
+            <div class="version">v1.0.0</div>
+        </div>
+
+        <div id="game-screen" class="screen">
+            <div id="hud">
+                <div class="hud-left">
+                    <div class="stat">Floor: <span id="current-floor">1</span></div>
+                    <div class="stat">Best: <span id="best-floor">1</span></div>
+                    <div class="stat">Score: <span id="score">0</span></div>
+                </div>
+                <div class="hud-right">
+                    <div id="combo-display" class="combo-hidden">
+                        <div class="combo-text">COMBO <span id="combo-count">0</span>x</div>
+                        <div class="combo-timer-bar">
+                            <div id="combo-timer-fill"></div>
+                        </div>
+                    </div>
+                    <div id="speed-indicator">Speed: <span id="speed-level">0</span></div>
+                </div>
+            </div>
+            <canvas id="game-canvas"></canvas>
+            <div id="hurry-banner" class="hurry-hidden">HURRY UP!</div>
+            <div id="pause-overlay" class="overlay hidden">
+                <h2>PAUSED</h2>
+                <button id="resume-btn" class="overlay-btn">Resume</button>
+                <button id="restart-btn" class="overlay-btn">Restart</button>
+                <button id="menu-btn" class="overlay-btn">Main Menu</button>
+            </div>
+        </div>
+
+        <div id="gameover-screen" class="screen">
+            <h1>GAME OVER</h1>
+            <div class="stats-container">
+                <div class="stat-line">Highest Floor: <span id="final-floor">0</span></div>
+                <div class="stat-line">Final Score: <span id="final-score">0</span></div>
+                <div class="stat-line">Best Combo: <span id="final-combo">0</span>x</div>
+                <div class="stat-line">Time Survived: <span id="final-time">0:00</span></div>
+            </div>
+            <div class="menu-buttons">
+                <button id="retry-btn" class="menu-btn">Retry</button>
+                <button id="mainmenu-btn" class="menu-btn">Main Menu</button>
+            </div>
+        </div>
+
+        <div id="practice-screen" class="screen">
+            <h1>PRACTICE MODE</h1>
+            <div class="practice-options">
+                <div class="option">
+                    <label>Starting Floor:</label>
+                    <input type="number" id="practice-floor" value="1" min="1" max="1000">
+                </div>
+                <div class="option">
+                    <label>Fixed Speed:</label>
+                    <input type="checkbox" id="practice-fixed-speed">
+                </div>
+            </div>
+            <div class="menu-buttons">
+                <button id="practice-start-btn" class="menu-btn">Start Practice</button>
+                <button id="practice-back-btn" class="menu-btn">Back</button>
+            </div>
+        </div>
+
+        <div id="settings-screen" class="screen">
+            <h1>SETTINGS</h1>
+            <div class="settings-container">
+                <div class="setting-group">
+                    <h3>Controls</h3>
+                    <div class="control-item">
+                        <span>Move Left:</span>
+                        <span class="key-display">←</span>
+                    </div>
+                    <div class="control-item">
+                        <span>Move Right:</span>
+                        <span class="key-display">→</span>
+                    </div>
+                    <div class="control-item">
+                        <span>Jump:</span>
+                        <span class="key-display">Space</span>
+                    </div>
+                    <div class="control-item">
+                        <span>Pause:</span>
+                        <span class="key-display">Esc</span>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <h3>Accessibility</h3>
+                    <div class="toggle-item">
+                        <label>
+                            <input type="checkbox" id="reduced-motion">
+                            Reduced Motion
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <label>
+                            <input type="checkbox" id="colorblind-mode">
+                            Colorblind Mode
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <button id="settings-back-btn" class="menu-btn">Back</button>
+        </div>
+
+        <div id="leaderboard-screen" class="screen">
+            <h1>LEADERBOARDS</h1>
+            <div class="leaderboard-tabs">
+                <button class="tab-btn active" data-tab="score">Score</button>
+                <button class="tab-btn" data-tab="floor">Highest Floor</button>
+                <button class="tab-btn" data-tab="combo">Longest Combo</button>
+            </div>
+            <div class="leaderboard-content">
+                <div class="leaderboard-list" id="leaderboard-list">
+                    <div class="no-scores">No scores yet. Be the first to play!</div>
+                </div>
+            </div>
+            <button id="leaderboard-back-btn" class="menu-btn">Back</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

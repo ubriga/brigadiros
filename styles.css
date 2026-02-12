@@ -1,0 +1,389 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    overflow: hidden;
+    color: white;
+}
+
+#game-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+}
+
+.screen {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+}
+
+.screen.active {
+    display: flex;
+}
+
+#menu-screen h1,
+#gameover-screen h1,
+#practice-screen h1,
+#settings-screen h1,
+#leaderboard-screen h1 {
+    font-size: 4em;
+    margin-bottom: 40px;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+    letter-spacing: 4px;
+}
+
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.menu-btn {
+    padding: 15px 40px;
+    font-size: 1.4em;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid white;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-radius: 8px;
+    min-width: 250px;
+}
+
+.menu-btn:hover {
+    background: rgba(255,255,255,0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.version {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    opacity: 0.7;
+    font-size: 0.9em;
+}
+
+/* Game Screen */
+#game-screen {
+    background: #87CEEB;
+}
+
+#game-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 20px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+    z-index: 10;
+}
+
+.hud-left,
+.hud-right {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.stat {
+    font-size: 1.2em;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+}
+
+#combo-display {
+    background: rgba(255,215,0,0.9);
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 3px solid #FFA500;
+    transition: all 0.3s;
+}
+
+#combo-display.combo-hidden {
+    display: none;
+}
+
+.combo-text {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #000;
+    text-align: center;
+}
+
+.combo-timer-bar {
+    width: 150px;
+    height: 8px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 4px;
+    margin-top: 5px;
+    overflow: hidden;
+}
+
+#combo-timer-fill {
+    height: 100%;
+    background: #FF4500;
+    width: 100%;
+    transition: width 0.1s linear;
+}
+
+#speed-indicator {
+    font-size: 1.1em;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+}
+
+#hurry-banner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 4em;
+    font-weight: bold;
+    color: #FF0000;
+    text-shadow: 4px 4px 8px rgba(0,0,0,0.8);
+    z-index: 15;
+    animation: pulse 0.5s ease-in-out;
+    pointer-events: none;
+}
+
+#hurry-banner.hurry-hidden {
+    display: none;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.2); }
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.overlay.hidden {
+    display: none;
+}
+
+.overlay h2 {
+    font-size: 3em;
+    margin-bottom: 30px;
+}
+
+.overlay-btn {
+    padding: 12px 35px;
+    font-size: 1.3em;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid white;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-radius: 8px;
+    margin: 8px;
+    min-width: 200px;
+}
+
+.overlay-btn:hover {
+    background: rgba(255,255,255,0.4);
+}
+
+/* Game Over Screen */
+.stats-container {
+    background: rgba(0,0,0,0.3);
+    padding: 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    min-width: 400px;
+}
+
+.stat-line {
+    font-size: 1.5em;
+    margin: 15px 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.stat-line span {
+    font-weight: bold;
+    color: #FFD700;
+}
+
+/* Practice Screen */
+.practice-options {
+    background: rgba(0,0,0,0.3);
+    padding: 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    min-width: 400px;
+}
+
+.option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 20px 0;
+    font-size: 1.2em;
+}
+
+.option input[type="number"] {
+    padding: 8px;
+    font-size: 1em;
+    width: 100px;
+    border-radius: 4px;
+    border: none;
+}
+
+.option input[type="checkbox"] {
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+}
+
+/* Settings Screen */
+.settings-container {
+    background: rgba(0,0,0,0.3);
+    padding: 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    min-width: 500px;
+}
+
+.setting-group {
+    margin-bottom: 30px;
+}
+
+.setting-group h3 {
+    font-size: 1.5em;
+    margin-bottom: 15px;
+    color: #FFD700;
+}
+
+.control-item,
+.toggle-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 12px 0;
+    font-size: 1.1em;
+}
+
+.key-display {
+    background: rgba(255,255,255,0.2);
+    padding: 8px 15px;
+    border-radius: 6px;
+    border: 2px solid white;
+    font-weight: bold;
+}
+
+.toggle-item input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+}
+
+/* Leaderboard Screen */
+.leaderboard-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    padding: 12px 25px;
+    font-size: 1.1em;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid white;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-radius: 8px 8px 0 0;
+}
+
+.tab-btn.active {
+    background: rgba(255,255,255,0.4);
+    border-bottom: none;
+}
+
+.leaderboard-content {
+    background: rgba(0,0,0,0.3);
+    padding: 30px;
+    border-radius: 12px;
+    min-width: 600px;
+    min-height: 400px;
+    margin-bottom: 30px;
+}
+
+.leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.leaderboard-entry {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 6px;
+    font-size: 1.1em;
+}
+
+.leaderboard-entry.player {
+    background: rgba(255,215,0,0.3);
+    border: 2px solid #FFD700;
+}
+
+.no-scores {
+    text-align: center;
+    font-size: 1.3em;
+    padding: 50px;
+    opacity: 0.7;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    #menu-screen h1 {
+        font-size: 2.5em;
+    }
+    
+    .menu-btn {
+        font-size: 1.1em;
+        min-width: 200px;
+    }
+    
+    .stats-container,
+    .practice-options,
+    .settings-container,
+    .leaderboard-content {
+        min-width: 90vw;
+    }
+}
