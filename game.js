@@ -4,18 +4,18 @@ const CONFIG = {
     CANVAS_HEIGHT: 800,
     PLAYER_WIDTH: 32,
     PLAYER_HEIGHT: 40,
-    FLOOR_HEIGHT: 25,   // Thicker floors (Req #5)
-    FLOOR_ROUNDNESS: 10, // Round edges (Req #5)
+    FLOOR_HEIGHT: 25,
+    FLOOR_ROUNDNESS: 10,
     FLOOR_MIN_WIDTH: 150,
     FLOOR_MAX_WIDTH: 350,
     FLOOR_VERTICAL_SPACING: 80,
     GRAVITY: 0.6,
-    JUMP_POWER_BASE: 12,
-    JUMP_POWER_MAX: 22,
-    MOVE_ACCELERATION: 0.5,
-    MOVE_MAX_SPEED: 8,
-    AIR_CONTROL: 0.8,
-    FRICTION: 0.90,
+    JUMP_POWER_BASE: 13, // Increased base slightly
+    JUMP_POWER_MAX: 24, // Increased max
+    MOVE_ACCELERATION: 0.8, // Snappier movement (Req #4)
+    MOVE_MAX_SPEED: 9,      // Higher base speed
+    AIR_CONTROL: 0.85,
+    FRICTION: 0.85,         // Lower friction to allow momentum preservation (Req #4)
     WALL_BOUNCE_MULTIPLIER: 0.7,
     SCROLL_START_FLOOR: 5,
     SCROLL_SPEED_INITIAL: 0.5,
@@ -25,17 +25,17 @@ const CONFIG = {
     COMBO_MIN_FLOORS: 2,
     COYOTE_TIME: 100,
     SIMULATION_FPS: 120,
-    THEME_INTERVAL: 100, // Change design every 100 floors (Req #4)
+    THEME_INTERVAL: 100,
     MOVE_SPEED_MULTIPLIER: 1.0
 };
 
-// Floor Themes (Req #4)
+// Floor Themes
 const THEMES = [
-    { name: 'Classic', colors: ['#8B4513', '#A0522D', '#CD853F', '#DEB887'] }, // Wood/Earth
-    { name: 'Ice', colors: ['#B0E0E6', '#ADD8E6', '#87CEFA', '#4682B4'] },      // Blue/Ice
-    { name: 'Neon', colors: ['#FF1493', '#00FF00', '#FF4500', '#FFFF00'] },      // Cyberpunk
-    { name: 'Dark', colors: ['#2F4F4F', '#483D8B', '#696969', '#708090'] },      // Night
-    { name: 'Candy', colors: ['#FF69B4', '#FFB6C1', '#FFC0CB', '#DB7093'] }       // Pink/Candy
+    { name: 'Classic', colors: ['#8B4513', '#A0522D', '#CD853F', '#DEB887'] },
+    { name: 'Ice', colors: ['#B0E0E6', '#ADD8E6', '#87CEFA', '#4682B4'] },
+    { name: 'Neon', colors: ['#FF1493', '#00FF00', '#FF4500', '#FFFF00'] },
+    { name: 'Dark', colors: ['#2F4F4F', '#483D8B', '#696969', '#708090'] },
+    { name: 'Candy', colors: ['#FF69B4', '#FFB6C1', '#FFC0CB', '#DB7093'] }
 ];
 
 const SKINS = [
@@ -46,7 +46,7 @@ const SKINS = [
     { id: 'ninja', name: 'Shadow Ninja', cost: 100, color: '#1a1a1a', headColor: '#FFE4C4' }
 ];
 
-// SHA-256 Hashes of the 10 coupons (1000 coins each)
+// SHA-256 Hashes
 const COUPON_HASHES = [
     '2a4d04dd777ff8035b8605067fb465ca24d3d69a3f18f243bce22cc261088a65',
     '4ff188ba2f513857d52f68fe980b54e55aa540646bbe00dae628fc9307fa7d16',
@@ -103,7 +103,7 @@ class GameState {
             facingRight: true
         };
         this.floors = [];
-        this.camera = { y: 0 }; // Camera starts at 0 and goes NEGATIVE as we go higher
+        this.camera = { y: 0 };
         this.currentFloor = 1;
         this.highestFloor = 1;
         this.score = 0;
@@ -124,12 +124,13 @@ class GameState {
         this.practiceSettings = { startFloor: 1, fixedSpeed: false };
         this.keys = {};
         this.gameOver = false;
+        this.scoreSubmitted = false;
         
         this.generateInitialFloors();
     }
 
     createFloor(i, lastY) {
-        const isSafeFloor = (i % 50 === 0); // Safe floor every 50 floors (Req #3)
+        const isSafeFloor = (i % 50 === 0);
         let width, x;
 
         if (isSafeFloor) {
@@ -147,7 +148,6 @@ class GameState {
     }
 
     generateInitialFloors() {
-        // Ground floor
         this.floors.push({
             y: CONFIG.CANVAS_HEIGHT - 100,
             width: CONFIG.CANVAS_WIDTH,
@@ -157,7 +157,6 @@ class GameState {
             isSafe: true
         });
 
-        // Generate floors upward
         for (let i = 2; i <= 30; i++) {
             const lastFloor = this.floors[this.floors.length - 1];
             const floor = this.createFloor(i, lastFloor.y);
@@ -167,12 +166,9 @@ class GameState {
 
     addFloorIfNeeded() {
         const topFloor = this.floors[this.floors.length - 1];
-        // Camera y is negative, so cameraTop is a larger negative number. 
-        // We want to generate floors well above the camera.
         const cameraTop = this.camera.y - CONFIG.CANVAS_HEIGHT; 
         
         let floorsAdded = 0;
-        // Generate floors if top floor is getting close to the view
         while (topFloor.y > cameraTop - 500 && floorsAdded < 10) {
             const lastFloor = this.floors[this.floors.length - 1];
             const floor = this.createFloor(lastFloor.floorNumber + 1, lastFloor.y);
@@ -182,7 +178,6 @@ class GameState {
     }
 
     removeOldFloors() {
-        // Remove floors that are way below the camera
         const cameraBottom = this.camera.y + CONFIG.CANVAS_HEIGHT + 200;
         this.floors = this.floors.filter(floor => floor.y < cameraBottom);
     }
@@ -197,6 +192,7 @@ class Game {
         this.lastFrameTime = Date.now();
         this.accumulator = 0;
         this.timestep = 1000 / CONFIG.SIMULATION_FPS;
+        this.currentLeaderboardTab = 'score';
         
         this.setupCanvas();
         this.setupEventListeners();
@@ -209,43 +205,48 @@ class Game {
     }
 
     setupEventListeners() {
-        // Keyboard
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
         document.addEventListener('keyup', (e) => this.handleKeyUp(e));
 
-        // Menu buttons
         document.getElementById('play-btn').addEventListener('click', () => this.startGame());
         document.getElementById('practice-btn').addEventListener('click', () => this.showScreen('practice-screen'));
         document.getElementById('leaderboard-btn').addEventListener('click', () => this.showLeaderboard());
         document.getElementById('settings-btn').addEventListener('click', () => this.showScreen('settings-screen'));
         document.getElementById('store-btn').addEventListener('click', () => this.showStore());
         
-        // Store buttons
         document.getElementById('store-back-btn').addEventListener('click', () => this.showScreen('menu-screen'));
         document.getElementById('redeem-btn').addEventListener('click', () => this.redeemCoupon());
 
-        // Pause overlay
         document.getElementById('resume-btn').addEventListener('click', () => this.resumeGame());
         document.getElementById('restart-btn').addEventListener('click', () => this.restartGame());
         document.getElementById('menu-btn').addEventListener('click', () => this.returnToMenu());
         
-        // Game over
         document.getElementById('retry-btn').addEventListener('click', () => this.startGame());
         document.getElementById('mainmenu-btn').addEventListener('click', () => this.returnToMenu());
         
-        // Practice
+        // Score Submission (Req #1)
+        document.getElementById('submit-score-btn').addEventListener('click', () => this.submitScore());
+
         document.getElementById('practice-start-btn').addEventListener('click', () => this.startPractice());
         document.getElementById('practice-back-btn').addEventListener('click', () => this.showScreen('menu-screen'));
         
-        // Settings
         document.getElementById('settings-back-btn').addEventListener('click', () => this.showScreen('menu-screen'));
         document.getElementById('game-speed').addEventListener('input', (e) => {
             CONFIG.MOVE_SPEED_MULTIPLIER = parseFloat(e.target.value);
             document.getElementById('speed-value').textContent = CONFIG.MOVE_SPEED_MULTIPLIER + 'x';
         });
         
-        // Leaderboard
         document.getElementById('leaderboard-back-btn').addEventListener('click', () => this.showScreen('menu-screen'));
+        
+        // Leaderboard Tabs (Req #2)
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.currentLeaderboardTab = e.target.dataset.tab;
+                this.updateLeaderboardDisplay();
+            });
+        });
     }
 
     handleKeyDown(e) {
@@ -394,17 +395,25 @@ class Game {
         this.showScreen('leaderboard-screen');
     }
 
+    // Updated Leaderboard Logic (Req #2)
     updateLeaderboardDisplay() {
         const scores = this.loadScores();
         const listEl = document.getElementById('leaderboard-list');
+        const tab = this.currentLeaderboardTab;
+
+        // Sort based on active tab
+        scores.sort((a, b) => b[tab] - a[tab]);
+
         if (scores.length === 0) {
             listEl.innerHTML = '<div class="no-scores">No scores yet. Be the first to play!</div>';
             return;
         }
+
         listEl.innerHTML = scores.map((entry, index) => `
             <div class="leaderboard-entry ${index === 0 ? 'player' : ''}">
                 <span>#${index + 1}</span>
-                <span>Floor ${entry.floor} | Score ${entry.score} | Combo ${entry.combo}x</span>
+                <span>${entry.name || 'Anonymous'}</span>
+                <span>${tab === 'score' ? '⭐' : (tab === 'floor' ? '🏢' : '🔥')} ${entry[tab]}</span>
                 <span>${new Date(entry.date).toLocaleDateString()}</span>
             </div>
         `).join('');
@@ -414,17 +423,27 @@ class Game {
         try { return JSON.parse(localStorage.getItem('brigadiros_scores') || '[]'); } catch { return []; }
     }
 
-    saveScore() {
+    // Updated Submit Score (Req #1)
+    submitScore() {
+        if (this.state.scoreSubmitted) return;
+
+        const nameInput = document.getElementById('player-name-input');
+        const name = nameInput.value.trim() || 'Anonymous';
+        
         const scores = this.loadScores();
         scores.push({
+            name: name,
             floor: this.state.highestFloor,
             score: this.state.score,
             combo: this.state.combo.maxCombo,
             date: Date.now()
         });
-        scores.sort((a, b) => b.score - a.score);
-        scores.splice(10);
+        
+        // Save score
         localStorage.setItem('brigadiros_scores', JSON.stringify(scores));
+        this.state.scoreSubmitted = true;
+        document.getElementById('highscore-input-container').classList.add('hidden');
+        alert('Score Submitted!');
     }
 
     gameLoop() {
@@ -461,23 +480,50 @@ class Game {
         const player = this.state.player;
         const speedMult = CONFIG.MOVE_SPEED_MULTIPLIER;
         
+        // Dynamic speed based on speed level (Req #3)
+        // Base speed increases by 10% for every speed level
+        const levelMultiplier = 1 + (this.state.speedLevel * 0.1); 
+        
+        // Calculate max speed and acceleration dynamically
+        const currentMaxSpeed = CONFIG.MOVE_MAX_SPEED * speedMult * levelMultiplier;
+        const currentAccel = CONFIG.MOVE_ACCELERATION * speedMult * levelMultiplier;
+
+        // Apply movement with momentum
         if (this.state.keys['ArrowLeft']) {
-            player.vx -= (player.onGround ? CONFIG.MOVE_ACCELERATION : CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL) * speedMult;
+            if (player.onGround) {
+                player.vx -= currentAccel;
+            } else {
+                player.vx -= currentAccel * CONFIG.AIR_CONTROL;
+            }
             player.facingRight = false;
         }
         if (this.state.keys['ArrowRight']) {
-            player.vx += (player.onGround ? CONFIG.MOVE_ACCELERATION : CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL) * speedMult;
+            if (player.onGround) {
+                player.vx += currentAccel;
+            } else {
+                player.vx += currentAccel * CONFIG.AIR_CONTROL;
+            }
             player.facingRight = true;
         }
 
+        // Friction
         if (player.onGround) player.vx *= CONFIG.FRICTION;
-        const maxSpeed = CONFIG.MOVE_MAX_SPEED * speedMult;
-        player.vx = Math.max(-maxSpeed, Math.min(maxSpeed, player.vx));
+        
+        // Limit speed, but allow temporary overspeed for momentum (Physics tweaking)
+        // If player is already faster than max speed, friction will naturally slow them down,
+        // so we only clamp if they are trying to accelerate further.
+        if (Math.abs(player.vx) > currentMaxSpeed) {
+             // Let friction handle it if no key pressed, or just soft clamp
+             player.vx *= 0.95; 
+        }
 
         const canJump = player.onGround || (Date.now() - player.lastGroundTime < CONFIG.COYOTE_TIME);
         if (this.state.keys[' '] && canJump && player.vy >= 0) {
-            const speed = Math.abs(player.vx);
-            const jumpPower = CONFIG.JUMP_POWER_BASE + (speed / maxSpeed) * (CONFIG.JUMP_POWER_MAX - CONFIG.JUMP_POWER_BASE);
+            // Momentum Jump (Req #4)
+            // If player has high horizontal speed, they jump higher.
+            const speedRatio = Math.min(1.2, Math.abs(player.vx) / CONFIG.MOVE_MAX_SPEED); // Allow up to 120% boost calc
+            const jumpPower = CONFIG.JUMP_POWER_BASE + (speedRatio) * (CONFIG.JUMP_POWER_MAX - CONFIG.JUMP_POWER_BASE);
+            
             player.vy = -jumpPower;
             player.onGround = false;
             this.state.keys[' '] = false;
@@ -550,17 +596,8 @@ class Game {
     }
 
     updateCamera() {
-        // Center player vertically
         const targetY = this.state.player.y + CONFIG.PLAYER_HEIGHT - CONFIG.CANVAS_HEIGHT / 2;
-        
-        // FIX #1: Allow camera to go upwards (negative) to follow player
-        // But preventing it from going DOWN (positive increase) if player falls
-        // effectively enforcing the "screen move" rule.
-        // We initialize camera at 0. As we go up, targetY becomes negative.
-        // We always take the minimum (highest point) the player has reached (adjusted for view).
-        
         if (this.state.camera.y === 0 && targetY > 0) {
-           // Initial state: don't move camera down if player is just jumping at start
         } else {
            this.state.camera.y = Math.min(this.state.camera.y, targetY);
         }
@@ -582,16 +619,10 @@ class Game {
                 this.state.lastSpeedIncrease = Date.now();
                 this.showHurryBanner();
             }
-            // Move everything down (scrolling up effect)
             for (const floor of this.state.floors) {
                 floor.y += this.state.scrollSpeed;
             }
             this.state.player.y += this.state.scrollSpeed;
-            // Also push camera down to keep sync with world move? 
-            // If objects move down, player y increases. targetY increases.
-            // But we clamped camera to MIN. 
-            // So camera stays UP while objects move DOWN away from it.
-            // This correctly effectively "scrolls" the view.
         }
     }
 
@@ -627,8 +658,6 @@ class Game {
     }
 
     checkGameOver() {
-        // Camera y is the top of the screen. Screen bottom is camera.y + Height.
-        // If player.y > bottom, they fell out.
         const screenBottom = this.state.camera.y + CONFIG.CANVAS_HEIGHT;
         if (this.state.player.y > screenBottom) {
             this.endGame();
@@ -637,7 +666,11 @@ class Game {
 
     endGame() {
         this.state.gameOver = true;
-        this.saveScore();
+        // Do NOT save score automatically now, wait for submission
+        // But we might want to save it as "Anonymous" just in case they don't submit?
+        // Let's keep automatic save for history but use submit for updating the name if they choose.
+        // Actually, let's just hold the score in state until they submit or leave.
+        
         const elapsed = Date.now() - this.state.gameStartTime;
         const minutes = Math.floor(elapsed / 60000);
         const seconds = Math.floor((elapsed % 60000) / 1000);
@@ -645,37 +678,37 @@ class Game {
         document.getElementById('final-score').textContent = this.state.score;
         document.getElementById('final-combo').textContent = this.state.combo.maxCombo;
         document.getElementById('final-time').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Show input
+        document.getElementById('highscore-input-container').classList.remove('hidden');
+        document.getElementById('player-name-input').value = '';
+        this.state.scoreSubmitted = false;
+
         this.showScreen('gameover-screen');
     }
 
     render() {
         this.ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
         
-        // Background
         const gradient = this.ctx.createLinearGradient(0, 0, 0, CONFIG.CANVAS_HEIGHT);
         gradient.addColorStop(0, '#87CEEB');
         gradient.addColorStop(1, '#E0F6FF');
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
 
-        // Floors
         for (const floor of this.state.floors) {
             const screenY = floor.y - this.state.camera.y;
             if (screenY > -50 && screenY < CONFIG.CANVAS_HEIGHT + 50) {
-                // Theme Selection (Req #4)
                 const themeIndex = (floor.theme % THEMES.length);
                 const theme = THEMES[themeIndex];
-                // Use floor number to cycle through theme colors
                 const color = theme.colors[floor.floorNumber % theme.colors.length];
                 
                 this.ctx.fillStyle = color;
                 
-                // Round Rect (Req #5)
                 this.ctx.beginPath();
                 this.ctx.roundRect(floor.x, screenY, floor.width, CONFIG.FLOOR_HEIGHT, CONFIG.FLOOR_ROUNDNESS);
                 this.ctx.fill();
                 
-                // Floor number
                 if (floor.width > 80) {
                     this.ctx.fillStyle = '#FFF';
                     this.ctx.font = 'bold 14px Arial';
@@ -685,7 +718,6 @@ class Game {
             }
         }
 
-        // Player
         const playerScreenY = this.state.player.y - this.state.camera.y;
         const skin = SKINS.find(s => s.id === this.state.currentSkin) || SKINS[0];
         
@@ -695,7 +727,6 @@ class Game {
         const h = CONFIG.PLAYER_HEIGHT;
         const facing = this.state.player.facingRight ? 1 : -1;
 
-        // Draw Player
         this.ctx.fillStyle = skin.headColor || '#FFE4C4';
         const headSize = w * 0.8;
         this.ctx.beginPath();
