@@ -646,7 +646,8 @@ class Game {
         this.saveScore();
         
         const elapsed = Date.now() - this.state.gameStartTime;
-        const minutes = Math.floor(elapsed / 60000);\n        const seconds = Math.floor((elapsed % 60000) / 1000);
+        const minutes = Math.floor(elapsed / 60000);
+        const seconds = Math.floor((elapsed % 60000) / 1000);
         
         document.getElementById('final-floor').textContent = this.state.highestFloor;
         document.getElementById('final-score').textContent = this.state.score;
