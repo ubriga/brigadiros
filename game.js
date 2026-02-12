@@ -1,37 +1,47 @@
 // Game Configuration
 const CONFIG = {
     CANVAS_WIDTH: 800,
-    CANVAS_HEIGHT: 800, // Increased height for "zoomed out" feel (more floors visible)
-    PLAYER_WIDTH: 32,   // Smaller player
-    PLAYER_HEIGHT: 40,  // Smaller player
-    FLOOR_HEIGHT: 16,   // Smaller floors
+    CANVAS_HEIGHT: 800,
+    PLAYER_WIDTH: 32,
+    PLAYER_HEIGHT: 40,
+    FLOOR_HEIGHT: 25,   // Thicker floors (Req #5)
+    FLOOR_ROUNDNESS: 10, // Round edges (Req #5)
     FLOOR_MIN_WIDTH: 150,
     FLOOR_MAX_WIDTH: 350,
-    FLOOR_VERTICAL_SPACING: 80, // Tighter spacing
+    FLOOR_VERTICAL_SPACING: 80,
     GRAVITY: 0.6,
     JUMP_POWER_BASE: 12,
     JUMP_POWER_MAX: 22,
-    MOVE_ACCELERATION: 0.5, // Reduced from 0.8 for softer start
-    MOVE_MAX_SPEED: 8,      // Reduced from 10 for controllable speed
-    AIR_CONTROL: 0.8,       // Increased from 0.6 for better air control
-    FRICTION: 0.90,         // Increased from 0.85 for softer stops (glidier)
+    MOVE_ACCELERATION: 0.5,
+    MOVE_MAX_SPEED: 8,
+    AIR_CONTROL: 0.8,
+    FRICTION: 0.90,
     WALL_BOUNCE_MULTIPLIER: 0.7,
     SCROLL_START_FLOOR: 5,
     SCROLL_SPEED_INITIAL: 0.5,
     SCROLL_SPEED_INCREMENT: 0.3,
-    SCROLL_INTERVAL: 30000, // 30 seconds
-    COMBO_TIMER: 3000, // 3 seconds
+    SCROLL_INTERVAL: 30000,
+    COMBO_TIMER: 3000,
     COMBO_MIN_FLOORS: 2,
-    COYOTE_TIME: 100, // ms
+    COYOTE_TIME: 100,
     SIMULATION_FPS: 120,
-    THEME_INTERVAL: 100,
-    MOVE_SPEED_MULTIPLIER: 1.0 // Default speed multiplier
+    THEME_INTERVAL: 100, // Change design every 100 floors (Req #4)
+    MOVE_SPEED_MULTIPLIER: 1.0
 };
+
+// Floor Themes (Req #4)
+const THEMES = [
+    { name: 'Classic', colors: ['#8B4513', '#A0522D', '#CD853F', '#DEB887'] }, // Wood/Earth
+    { name: 'Ice', colors: ['#B0E0E6', '#ADD8E6', '#87CEFA', '#4682B4'] },      // Blue/Ice
+    { name: 'Neon', colors: ['#FF1493', '#00FF00', '#FF4500', '#FFFF00'] },      // Cyberpunk
+    { name: 'Dark', colors: ['#2F4F4F', '#483D8B', '#696969', '#708090'] },      // Night
+    { name: 'Candy', colors: ['#FF69B4', '#FFB6C1', '#FFC0CB', '#DB7093'] }       // Pink/Candy
+];
 
 const SKINS = [
     { id: 'default', name: 'Red Runner', cost: 0, color: '#FF6347', headColor: '#FFE4C4' },
     { id: 'blue', name: 'Blue Dasher', cost: 100, color: '#4169E1', headColor: '#FFE4C4' },
-    { id: 'green', name: 'Green Sprinter', cost: 100, color: '#32CD32', headColor: '#8FBC8F' }, // Alien-ish
+    { id: 'green', name: 'Green Sprinter', cost: 100, color: '#32CD32', headColor: '#8FBC8F' },
     { id: 'gold', name: 'Golden Hero', cost: 100, color: '#FFD700', headColor: '#FFE4C4' },
     { id: 'ninja', name: 'Shadow Ninja', cost: 100, color: '#1a1a1a', headColor: '#FFE4C4' }
 ];
@@ -93,7 +103,7 @@ class GameState {
             facingRight: true
         };
         this.floors = [];
-        this.camera = { y: 0 };
+        this.camera = { y: 0 }; // Camera starts at 0 and goes NEGATIVE as we go higher
         this.currentFloor = 1;
         this.highestFloor = 1;
         this.score = 0;
@@ -118,6 +128,24 @@ class GameState {
         this.generateInitialFloors();
     }
 
+    createFloor(i, lastY) {
+        const isSafeFloor = (i % 50 === 0); // Safe floor every 50 floors (Req #3)
+        let width, x;
+
+        if (isSafeFloor) {
+            width = CONFIG.CANVAS_WIDTH;
+            x = 0;
+        } else {
+            width = CONFIG.FLOOR_MIN_WIDTH + Math.random() * (CONFIG.FLOOR_MAX_WIDTH - CONFIG.FLOOR_MIN_WIDTH);
+            x = Math.random() * (CONFIG.CANVAS_WIDTH - width);
+        }
+
+        const y = lastY - CONFIG.FLOOR_VERTICAL_SPACING;
+        const theme = Math.floor((i - 1) / CONFIG.THEME_INTERVAL);
+        
+        return { x, y, width, floorNumber: i, theme, isSafe: isSafeFloor };
+    }
+
     generateInitialFloors() {
         // Ground floor
         this.floors.push({
@@ -125,41 +153,36 @@ class GameState {
             width: CONFIG.CANVAS_WIDTH,
             x: 0,
             floorNumber: 1,
-            theme: 0
+            theme: 0,
+            isSafe: true
         });
 
         // Generate floors upward
         for (let i = 2; i <= 30; i++) {
             const lastFloor = this.floors[this.floors.length - 1];
-            const width = CONFIG.FLOOR_MIN_WIDTH + Math.random() * (CONFIG.FLOOR_MAX_WIDTH - CONFIG.FLOOR_MIN_WIDTH);
-            const x = Math.random() * (CONFIG.CANVAS_WIDTH - width);
-            const y = lastFloor.y - CONFIG.FLOOR_VERTICAL_SPACING;
-            const theme = Math.floor((i - 1) / CONFIG.THEME_INTERVAL);
-            
-            this.floors.push({ x, y, width, floorNumber: i, theme });
+            const floor = this.createFloor(i, lastFloor.y);
+            this.floors.push(floor);
         }
     }
 
     addFloorIfNeeded() {
         const topFloor = this.floors[this.floors.length - 1];
-        const cameraTop = this.camera.y - CONFIG.CANVAS_HEIGHT;
-        let floorsAdded = 0;
+        // Camera y is negative, so cameraTop is a larger negative number. 
+        // We want to generate floors well above the camera.
+        const cameraTop = this.camera.y - CONFIG.CANVAS_HEIGHT; 
         
-        // Safety break: Limit floors added per frame to prevent infinite loops/memory crashes
+        let floorsAdded = 0;
+        // Generate floors if top floor is getting close to the view
         while (topFloor.y > cameraTop - 500 && floorsAdded < 10) {
             const lastFloor = this.floors[this.floors.length - 1];
-            const width = CONFIG.FLOOR_MIN_WIDTH + Math.random() * (CONFIG.FLOOR_MAX_WIDTH - CONFIG.FLOOR_MIN_WIDTH);
-            const x = Math.random() * (CONFIG.CANVAS_WIDTH - width);
-            const y = lastFloor.y - CONFIG.FLOOR_VERTICAL_SPACING;
-            const floorNumber = lastFloor.floorNumber + 1;
-            const theme = Math.floor((floorNumber - 1) / CONFIG.THEME_INTERVAL);
-            
-            this.floors.push({ x, y, width, floorNumber, theme });
+            const floor = this.createFloor(lastFloor.floorNumber + 1, lastFloor.y);
+            this.floors.push(floor);
             floorsAdded++;
         }
     }
 
     removeOldFloors() {
+        // Remove floors that are way below the camera
         const cameraBottom = this.camera.y + CONFIG.CANVAS_HEIGHT + 200;
         this.floors = this.floors.filter(floor => floor.y < cameraBottom);
     }
@@ -227,7 +250,6 @@ class Game {
 
     handleKeyDown(e) {
         this.state.keys[e.key] = true;
-        
         if (e.key === 'Escape' && document.getElementById('game-screen').classList.contains('active')) {
             this.togglePause();
         }
@@ -269,7 +291,6 @@ class Game {
             return `
                 <div class="skin-card ${owned ? 'owned' : ''} ${equipped ? 'equipped' : ''}" style="border-color: ${skin.color}">
                     <div class="skin-preview" style="background-color: ${skin.color}; position: relative;">
-                         <!-- Simple CSS preview of the new character style -->
                          <div style="position: absolute; top: 10%; left: 25%; width: 50%; height: 25%; background: ${skin.headColor}; border-radius: 50%;"></div>
                          <div style="position: absolute; top: 35%; left: 20%; width: 60%; height: 40%; background: ${skin.color}; border-radius: 4px;"></div>
                          <div style="position: absolute; top: 75%; left: 25%; width: 15%; height: 20%; background: #333;"></div>
@@ -287,12 +308,10 @@ class Game {
         if (!skin) return;
 
         if (this.state.ownedSkins.includes(skinId)) {
-            // Equip
             this.state.currentSkin = skinId;
             this.state.saveUserData();
             this.updateStoreUI();
         } else {
-            // Buy
             if (this.state.coins >= skin.cost) {
                 this.state.coins -= skin.cost;
                 this.state.ownedSkins.push(skinId);
@@ -340,7 +359,6 @@ class Game {
         this.state.practiceSettings.startFloor = parseInt(document.getElementById('practice-floor').value) || 1;
         this.state.practiceSettings.fixedSpeed = document.getElementById('practice-fixed-speed').checked;
         
-        // Adjust starting position
         if (this.state.practiceSettings.startFloor > 1) {
             this.state.currentFloor = this.state.practiceSettings.startFloor;
             this.state.highestFloor = this.state.practiceSettings.startFloor;
@@ -352,10 +370,8 @@ class Game {
 
     togglePause() {
         if (this.state.gameOver) return;
-        
         this.state.isPaused = !this.state.isPaused;
         const overlay = document.getElementById('pause-overlay');
-        
         if (this.state.isPaused) {
             overlay.classList.remove('hidden');
         } else {
@@ -364,18 +380,8 @@ class Game {
         }
     }
 
-    resumeGame() {
-        this.togglePause();
-    }
-
-    restartGame() {
-        if (this.state.practiceMode) {
-            this.startPractice();
-        } else {
-            this.startGame();
-        }
-    }
-
+    resumeGame() { this.togglePause(); }
+    restartGame() { this.state.practiceMode ? this.startPractice() : this.startGame(); }
     returnToMenu() {
         this.state.isPaused = false;
         this.state.gameOver = false;
@@ -391,12 +397,10 @@ class Game {
     updateLeaderboardDisplay() {
         const scores = this.loadScores();
         const listEl = document.getElementById('leaderboard-list');
-        
         if (scores.length === 0) {
             listEl.innerHTML = '<div class="no-scores">No scores yet. Be the first to play!</div>';
             return;
         }
-
         listEl.innerHTML = scores.map((entry, index) => `
             <div class="leaderboard-entry ${index === 0 ? 'player' : ''}">
                 <span>#${index + 1}</span>
@@ -407,11 +411,7 @@ class Game {
     }
 
     loadScores() {
-        try {
-            return JSON.parse(localStorage.getItem('brigadiros_scores') || '[]');
-        } catch {
-            return [];
-        }
+        try { return JSON.parse(localStorage.getItem('brigadiros_scores') || '[]'); } catch { return []; }
     }
 
     saveScore() {
@@ -423,7 +423,7 @@ class Game {
             date: Date.now()
         });
         scores.sort((a, b) => b.score - a.score);
-        scores.splice(10); // Keep top 10
+        scores.splice(10);
         localStorage.setItem('brigadiros_scores', JSON.stringify(scores));
     }
 
@@ -434,18 +434,14 @@ class Game {
             }
             return;
         }
-
         const currentTime = Date.now();
         const deltaTime = Math.min(currentTime - this.lastFrameTime, 100);
         this.lastFrameTime = currentTime;
         this.accumulator += deltaTime;
-
-        // Fixed timestep simulation
         while (this.accumulator >= this.timestep) {
             this.update(this.timestep);
             this.accumulator -= this.timestep;
         }
-
         this.render();
         requestAnimationFrame(() => this.gameLoop());
     }
@@ -465,53 +461,32 @@ class Game {
         const player = this.state.player;
         const speedMult = CONFIG.MOVE_SPEED_MULTIPLIER;
         
-        // Horizontal movement
         if (this.state.keys['ArrowLeft']) {
-            if (player.onGround) {
-                player.vx -= CONFIG.MOVE_ACCELERATION * speedMult;
-            } else {
-                player.vx -= CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL * speedMult;
-            }
+            player.vx -= (player.onGround ? CONFIG.MOVE_ACCELERATION : CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL) * speedMult;
             player.facingRight = false;
         }
         if (this.state.keys['ArrowRight']) {
-            if (player.onGround) {
-                player.vx += CONFIG.MOVE_ACCELERATION * speedMult;
-            } else {
-                player.vx += CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL * speedMult;
-            }
+            player.vx += (player.onGround ? CONFIG.MOVE_ACCELERATION : CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL) * speedMult;
             player.facingRight = true;
         }
 
-        // Apply friction
-        if (player.onGround) {
-            player.vx *= CONFIG.FRICTION;
-        }
-
-        // Clamp horizontal speed
+        if (player.onGround) player.vx *= CONFIG.FRICTION;
         const maxSpeed = CONFIG.MOVE_MAX_SPEED * speedMult;
         player.vx = Math.max(-maxSpeed, Math.min(maxSpeed, player.vx));
 
-        // Jump
         const canJump = player.onGround || (Date.now() - player.lastGroundTime < CONFIG.COYOTE_TIME);
         if (this.state.keys[' '] && canJump && player.vy >= 0) {
             const speed = Math.abs(player.vx);
             const jumpPower = CONFIG.JUMP_POWER_BASE + (speed / maxSpeed) * (CONFIG.JUMP_POWER_MAX - CONFIG.JUMP_POWER_BASE);
             player.vy = -jumpPower;
             player.onGround = false;
-            this.state.keys[' '] = false; // Prevent holding
+            this.state.keys[' '] = false;
         }
 
-        // Gravity
-        if (!player.onGround) {
-            player.vy += CONFIG.GRAVITY;
-        }
-
-        // Update position
+        if (!player.onGround) player.vy += CONFIG.GRAVITY;
         player.x += player.vx;
         player.y += player.vy;
 
-        // Wall collision
         if (player.x < 0) {
             player.x = 0;
             player.vx = -player.vx * CONFIG.WALL_BOUNCE_MULTIPLIER;
@@ -520,12 +495,11 @@ class Game {
             player.vx = -player.vx * CONFIG.WALL_BOUNCE_MULTIPLIER;
         }
 
-        // Floor collision
         player.onGround = false;
         for (const floor of this.state.floors) {
-            if (player.vy >= 0 && // Moving down
+            if (player.vy >= 0 &&
                 player.y + CONFIG.PLAYER_HEIGHT >= floor.y &&
-                player.y + CONFIG.PLAYER_HEIGHT <= floor.y + CONFIG.FLOOR_HEIGHT + 10 &&
+                player.y + CONFIG.PLAYER_HEIGHT <= floor.y + CONFIG.FLOOR_HEIGHT + 15 &&
                 player.x + CONFIG.PLAYER_WIDTH > floor.x &&
                 player.x < floor.x + floor.width) {
                 
@@ -533,7 +507,6 @@ class Game {
                 player.vy = 0;
                 player.onGround = true;
                 player.lastGroundTime = Date.now();
-                
                 this.handleFloorLanding(floor);
                 break;
             }
@@ -550,7 +523,6 @@ class Game {
                 this.state.score += floor.floorNumber;
             }
 
-            // Combo system
             if (floorDiff >= CONFIG.COMBO_MIN_FLOORS) {
                 if (!this.state.combo.active) {
                     this.state.combo.active = true;
@@ -562,7 +534,6 @@ class Game {
                 }
                 this.state.combo.lastLandTime = Date.now();
                 this.state.score += floorDiff * 10 * this.state.combo.count;
-                
                 if (this.state.combo.count > this.state.combo.maxCombo) {
                     this.state.combo.maxCombo = this.state.combo.count;
                 }
@@ -579,14 +550,24 @@ class Game {
     }
 
     updateCamera() {
+        // Center player vertically
         const targetY = this.state.player.y + CONFIG.PLAYER_HEIGHT - CONFIG.CANVAS_HEIGHT / 2;
-        this.state.camera.y = Math.max(0, targetY);
+        
+        // FIX #1: Allow camera to go upwards (negative) to follow player
+        // But preventing it from going DOWN (positive increase) if player falls
+        // effectively enforcing the "screen move" rule.
+        // We initialize camera at 0. As we go up, targetY becomes negative.
+        // We always take the minimum (highest point) the player has reached (adjusted for view).
+        
+        if (this.state.camera.y === 0 && targetY > 0) {
+           // Initial state: don't move camera down if player is just jumping at start
+        } else {
+           this.state.camera.y = Math.min(this.state.camera.y, targetY);
+        }
     }
 
     updateScrolling() {
-        if (this.state.practiceSettings.fixedSpeed && this.state.practiceMode) {
-            return;
-        }
+        if (this.state.practiceSettings.fixedSpeed && this.state.practiceMode) return;
 
         if (!this.state.scrollActive && this.state.currentFloor >= CONFIG.SCROLL_START_FLOOR) {
             this.state.scrollActive = true;
@@ -595,19 +576,22 @@ class Game {
         }
 
         if (this.state.scrollActive) {
-            // Increase scroll speed over time
             if (Date.now() - this.state.lastSpeedIncrease >= CONFIG.SCROLL_INTERVAL) {
                 this.state.scrollSpeed += CONFIG.SCROLL_SPEED_INCREMENT;
                 this.state.speedLevel++;
                 this.state.lastSpeedIncrease = Date.now();
                 this.showHurryBanner();
             }
-
-            // Apply scrolling
+            // Move everything down (scrolling up effect)
             for (const floor of this.state.floors) {
                 floor.y += this.state.scrollSpeed;
             }
             this.state.player.y += this.state.scrollSpeed;
+            // Also push camera down to keep sync with world move? 
+            // If objects move down, player y increases. targetY increases.
+            // But we clamped camera to MIN. 
+            // So camera stays UP while objects move DOWN away from it.
+            // This correctly effectively "scrolls" the view.
         }
     }
 
@@ -620,9 +604,7 @@ class Game {
     updateCombo() {
         if (this.state.combo.active) {
             const elapsed = Date.now() - this.state.combo.lastLandTime;
-            if (elapsed >= CONFIG.COMBO_TIMER) {
-                this.endCombo();
-            }
+            if (elapsed >= CONFIG.COMBO_TIMER) this.endCombo();
         }
     }
 
@@ -631,12 +613,10 @@ class Game {
         document.getElementById('best-floor').textContent = this.state.highestFloor;
         document.getElementById('score').textContent = this.state.score;
         document.getElementById('speed-level').textContent = this.state.speedLevel;
-
         const comboDisplay = document.getElementById('combo-display');
         if (this.state.combo.active) {
             comboDisplay.classList.remove('combo-hidden');
             document.getElementById('combo-count').textContent = this.state.combo.count;
-            
             const elapsed = Date.now() - this.state.combo.lastLandTime;
             const remaining = Math.max(0, CONFIG.COMBO_TIMER - elapsed);
             const percentage = (remaining / CONFIG.COMBO_TIMER) * 100;
@@ -647,6 +627,8 @@ class Game {
     }
 
     checkGameOver() {
+        // Camera y is the top of the screen. Screen bottom is camera.y + Height.
+        // If player.y > bottom, they fell out.
         const screenBottom = this.state.camera.y + CONFIG.CANVAS_HEIGHT;
         if (this.state.player.y > screenBottom) {
             this.endGame();
@@ -656,16 +638,13 @@ class Game {
     endGame() {
         this.state.gameOver = true;
         this.saveScore();
-        
         const elapsed = Date.now() - this.state.gameStartTime;
         const minutes = Math.floor(elapsed / 60000);
         const seconds = Math.floor((elapsed % 60000) / 1000);
-        
         document.getElementById('final-floor').textContent = this.state.highestFloor;
         document.getElementById('final-score').textContent = this.state.score;
         document.getElementById('final-combo').textContent = this.state.combo.maxCombo;
         document.getElementById('final-time').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        
         this.showScreen('gameover-screen');
     }
 
@@ -683,58 +662,58 @@ class Game {
         for (const floor of this.state.floors) {
             const screenY = floor.y - this.state.camera.y;
             if (screenY > -50 && screenY < CONFIG.CANVAS_HEIGHT + 50) {
-                const colors = ['#8B4513', '#A0522D', '#CD853F', '#DEB887'];
-                this.ctx.fillStyle = colors[floor.theme % colors.length];
-                this.ctx.fillRect(floor.x, screenY, floor.width, CONFIG.FLOOR_HEIGHT);
+                // Theme Selection (Req #4)
+                const themeIndex = (floor.theme % THEMES.length);
+                const theme = THEMES[themeIndex];
+                // Use floor number to cycle through theme colors
+                const color = theme.colors[floor.floorNumber % theme.colors.length];
+                
+                this.ctx.fillStyle = color;
+                
+                // Round Rect (Req #5)
+                this.ctx.beginPath();
+                this.ctx.roundRect(floor.x, screenY, floor.width, CONFIG.FLOOR_HEIGHT, CONFIG.FLOOR_ROUNDNESS);
+                this.ctx.fill();
                 
                 // Floor number
                 if (floor.width > 80) {
                     this.ctx.fillStyle = '#FFF';
                     this.ctx.font = 'bold 14px Arial';
                     this.ctx.textAlign = 'center';
-                    this.ctx.fillText(floor.floorNumber, floor.x + floor.width / 2, screenY + 14);
+                    this.ctx.fillText(floor.floorNumber, floor.x + floor.width / 2, screenY + 18);
                 }
             }
         }
 
         // Player
         const playerScreenY = this.state.player.y - this.state.camera.y;
-        
-        // Get current skin
         const skin = SKINS.find(s => s.id === this.state.currentSkin) || SKINS[0];
         
-        // Draw Humanoid Figure
         const cx = this.state.player.x;
         const cy = playerScreenY;
         const w = CONFIG.PLAYER_WIDTH;
         const h = CONFIG.PLAYER_HEIGHT;
         const facing = this.state.player.facingRight ? 1 : -1;
 
-        // Head
+        // Draw Player
         this.ctx.fillStyle = skin.headColor || '#FFE4C4';
         const headSize = w * 0.8;
         this.ctx.beginPath();
         this.ctx.arc(cx + w/2, cy + headSize/2, headSize/2, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Body (Shirt)
         this.ctx.fillStyle = skin.color;
         this.ctx.fillRect(cx + w*0.1, cy + headSize, w * 0.8, h * 0.45);
 
-        // Legs (Pants)
         this.ctx.fillStyle = '#333';
         const legW = w * 0.3;
         const legH = h * 0.3;
-        // Left leg
         this.ctx.fillRect(cx + w*0.15, cy + headSize + h*0.45, legW, legH);
-        // Right leg
         this.ctx.fillRect(cx + w*0.55, cy + headSize + h*0.45, legW, legH);
 
-        // Ninja Headband
         if (skin.id === 'ninja') {
             this.ctx.fillStyle = '#FF0000';
             this.ctx.fillRect(cx + w*0.1, cy + 5, w * 0.8, 5);
-            // Band tails
             if (Math.abs(this.state.player.vx) > 1) {
                 this.ctx.beginPath();
                 this.ctx.moveTo(cx + w/2 - (10 * facing), cy + 7);
@@ -745,7 +724,6 @@ class Game {
             }
         }
         
-        // Eyes
         this.ctx.fillStyle = '#000';
         const eyeOffset = facing === 1 ? 2 : -2;
         if (skin.id === 'ninja') {
@@ -761,7 +739,6 @@ class Game {
     }
 }
 
-// Global hook for button clicks
 window.game = null;
 window.addEventListener('load', () => {
     window.game = new Game();
