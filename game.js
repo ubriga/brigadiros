@@ -11,10 +11,10 @@ const CONFIG = {
     GRAVITY: 0.6,
     JUMP_POWER_BASE: 12,
     JUMP_POWER_MAX: 22,
-    MOVE_ACCELERATION: 0.8,
-    MOVE_MAX_SPEED: 10,
-    AIR_CONTROL: 0.6,
-    FRICTION: 0.85,
+    MOVE_ACCELERATION: 0.5, // Reduced from 0.8 for softer start
+    MOVE_MAX_SPEED: 8,      // Reduced from 10 for controllable speed
+    AIR_CONTROL: 0.8,       // Increased from 0.6 for better air control
+    FRICTION: 0.90,         // Increased from 0.85 for softer stops (glidier)
     WALL_BOUNCE_MULTIPLIER: 0.7,
     SCROLL_START_FLOOR: 5,
     SCROLL_SPEED_INITIAL: 0.5,
@@ -29,11 +29,11 @@ const CONFIG = {
 };
 
 const SKINS = [
-    { id: 'default', name: 'Red Box', cost: 0, color: '#FF6347' },
-    { id: 'blue', name: 'Blue Box', cost: 100, color: '#4169E1' },
-    { id: 'green', name: 'Green Box', cost: 100, color: '#32CD32' },
-    { id: 'gold', name: 'Golden Box', cost: 100, color: '#FFD700' },
-    { id: 'ninja', name: 'Ninja', cost: 100, color: '#000000' }
+    { id: 'default', name: 'Red Runner', cost: 0, color: '#FF6347', headColor: '#FFE4C4' },
+    { id: 'blue', name: 'Blue Dasher', cost: 100, color: '#4169E1', headColor: '#FFE4C4' },
+    { id: 'green', name: 'Green Sprinter', cost: 100, color: '#32CD32', headColor: '#8FBC8F' }, // Alien-ish
+    { id: 'gold', name: 'Golden Hero', cost: 100, color: '#FFD700', headColor: '#FFE4C4' },
+    { id: 'ninja', name: 'Shadow Ninja', cost: 100, color: '#1a1a1a', headColor: '#FFE4C4' }
 ];
 
 // SHA-256 Hashes of the 10 coupons (1000 coins each)
@@ -89,7 +89,8 @@ class GameState {
             vx: 0,
             vy: 0,
             onGround: false,
-            lastGroundTime: 0
+            lastGroundTime: 0,
+            facingRight: true
         };
         this.floors = [];
         this.camera = { y: 0 };
@@ -142,8 +143,10 @@ class GameState {
     addFloorIfNeeded() {
         const topFloor = this.floors[this.floors.length - 1];
         const cameraTop = this.camera.y - CONFIG.CANVAS_HEIGHT;
+        let floorsAdded = 0;
         
-        while (topFloor.y > cameraTop - 500) {
+        // Safety break: Limit floors added per frame to prevent infinite loops/memory crashes
+        while (topFloor.y > cameraTop - 500 && floorsAdded < 10) {
             const lastFloor = this.floors[this.floors.length - 1];
             const width = CONFIG.FLOOR_MIN_WIDTH + Math.random() * (CONFIG.FLOOR_MAX_WIDTH - CONFIG.FLOOR_MIN_WIDTH);
             const x = Math.random() * (CONFIG.CANVAS_WIDTH - width);
@@ -152,6 +155,7 @@ class GameState {
             const theme = Math.floor((floorNumber - 1) / CONFIG.THEME_INTERVAL);
             
             this.floors.push({ x, y, width, floorNumber, theme });
+            floorsAdded++;
         }
     }
 
@@ -264,7 +268,13 @@ class Game {
 
             return `
                 <div class="skin-card ${owned ? 'owned' : ''} ${equipped ? 'equipped' : ''}" style="border-color: ${skin.color}">
-                    <div class="skin-preview" style="background-color: ${skin.color}"></div>
+                    <div class="skin-preview" style="background-color: ${skin.color}; position: relative;">
+                         <!-- Simple CSS preview of the new character style -->
+                         <div style="position: absolute; top: 10%; left: 25%; width: 50%; height: 25%; background: ${skin.headColor}; border-radius: 50%;"></div>
+                         <div style="position: absolute; top: 35%; left: 20%; width: 60%; height: 40%; background: ${skin.color}; border-radius: 4px;"></div>
+                         <div style="position: absolute; top: 75%; left: 25%; width: 15%; height: 20%; background: #333;"></div>
+                         <div style="position: absolute; top: 75%; left: 60%; width: 15%; height: 20%; background: #333;"></div>
+                    </div>
                     <div class="skin-name">${skin.name}</div>
                     <button onclick="window.game.handleSkinAction('${skin.id}')" class="${btnClass}" ${equipped ? 'disabled' : ''}>${btnText}</button>
                 </div>
@@ -462,6 +472,7 @@ class Game {
             } else {
                 player.vx -= CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL * speedMult;
             }
+            player.facingRight = false;
         }
         if (this.state.keys['ArrowRight']) {
             if (player.onGround) {
@@ -469,6 +480,7 @@ class Game {
             } else {
                 player.vx += CONFIG.MOVE_ACCELERATION * CONFIG.AIR_CONTROL * speedMult;
             }
+            player.facingRight = true;
         }
 
         // Apply friction
@@ -688,35 +700,63 @@ class Game {
         // Player
         const playerScreenY = this.state.player.y - this.state.camera.y;
         
-        // Get current skin color
+        // Get current skin
         const skin = SKINS.find(s => s.id === this.state.currentSkin) || SKINS[0];
+        
+        // Draw Humanoid Figure
+        const cx = this.state.player.x;
+        const cy = playerScreenY;
+        const w = CONFIG.PLAYER_WIDTH;
+        const h = CONFIG.PLAYER_HEIGHT;
+        const facing = this.state.player.facingRight ? 1 : -1;
+
+        // Head
+        this.ctx.fillStyle = skin.headColor || '#FFE4C4';
+        const headSize = w * 0.8;
+        this.ctx.beginPath();
+        this.ctx.arc(cx + w/2, cy + headSize/2, headSize/2, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Body (Shirt)
         this.ctx.fillStyle = skin.color;
-        
-        this.ctx.fillRect(
-            this.state.player.x,
-            playerScreenY,
-            CONFIG.PLAYER_WIDTH,
-            CONFIG.PLAYER_HEIGHT
-        );
-        
-        // Player face (adjust based on skin if needed, for now simple)
-        this.ctx.fillStyle = '#000'; // Eyes always black
-        
+        this.ctx.fillRect(cx + w*0.1, cy + headSize, w * 0.8, h * 0.45);
+
+        // Legs (Pants)
+        this.ctx.fillStyle = '#333';
+        const legW = w * 0.3;
+        const legH = h * 0.3;
+        // Left leg
+        this.ctx.fillRect(cx + w*0.15, cy + headSize + h*0.45, legW, legH);
+        // Right leg
+        this.ctx.fillRect(cx + w*0.55, cy + headSize + h*0.45, legW, legH);
+
+        // Ninja Headband
         if (skin.id === 'ninja') {
-            // Ninja band
             this.ctx.fillStyle = '#FF0000';
-            this.ctx.fillRect(this.state.player.x, playerScreenY + 10, CONFIG.PLAYER_WIDTH, 10);
-            this.ctx.fillStyle = '#FFF'; // White eyes
+            this.ctx.fillRect(cx + w*0.1, cy + 5, w * 0.8, 5);
+            // Band tails
+            if (Math.abs(this.state.player.vx) > 1) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(cx + w/2 - (10 * facing), cy + 7);
+                this.ctx.lineTo(cx + w/2 - (25 * facing), cy + 2);
+                this.ctx.strokeStyle = '#FF0000';
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+            }
         }
         
         // Eyes
-        this.ctx.fillRect(this.state.player.x + 8, playerScreenY + 15, 5, 5);
-        this.ctx.fillRect(this.state.player.x + 20, playerScreenY + 15, 5, 5);
-        
-        // Mouth
-        if (skin.id !== 'ninja') {
-            this.ctx.fillStyle = '#000';
-            this.ctx.fillRect(this.state.player.x + 8, playerScreenY + 30, 16, 3);
+        this.ctx.fillStyle = '#000';
+        const eyeOffset = facing === 1 ? 2 : -2;
+        if (skin.id === 'ninja') {
+            this.ctx.fillStyle = '#FFF';
+            this.ctx.fillRect(cx + w/2 + (2 + eyeOffset), cy + 10, 4, 3);
+            this.ctx.fillRect(cx + w/2 + (-6 + eyeOffset), cy + 10, 4, 3);
+        } else {
+            this.ctx.beginPath();
+            this.ctx.arc(cx + w/2 + (4 * facing), cy + headSize * 0.4, 2, 0, Math.PI * 2);
+            this.ctx.arc(cx + w/2 + (-2 * facing), cy + headSize * 0.4, 2, 0, Math.PI * 2);
+            this.ctx.fill();
         }
     }
 }
