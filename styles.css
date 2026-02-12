@@ -233,7 +233,8 @@ body {
     gap: 20px;
 }
 
-.stat-line span {\n    font-weight: bold;
+.stat-line span {
+    font-weight: bold;
     color: #FFD700;
 }
 
