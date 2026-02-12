@@ -629,7 +629,8 @@ class Game {
             const remaining = Math.max(0, CONFIG.COMBO_TIMER - elapsed);
             const percentage = (remaining / CONFIG.COMBO_TIMER) * 100;
             document.getElementById('combo-timer-fill').style.width = percentage + '%';
-        } else {\n            comboDisplay.classList.add('combo-hidden');
+        } else {
+            comboDisplay.classList.add('combo-hidden');
         }
     }
 
@@ -645,8 +646,7 @@ class Game {
         this.saveScore();
         
         const elapsed = Date.now() - this.state.gameStartTime;
-        const minutes = Math.floor(elapsed / 60000);
-        const seconds = Math.floor((elapsed % 60000) / 1000);
+        const minutes = Math.floor(elapsed / 60000);\n        const seconds = Math.floor((elapsed % 60000) / 1000);
         
         document.getElementById('final-floor').textContent = this.state.highestFloor;
         document.getElementById('final-score').textContent = this.state.score;
